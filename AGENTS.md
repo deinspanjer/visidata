@@ -2,8 +2,9 @@
 
 ## Start Here (Progressive Disclosure)
 - Read `CLAUDE.md` first for the primary contributor workflow and architecture context.
-- Pre-edit gate (mandatory)
-  - Follow Human Review Canary Workflow in `CLAUDE.md`
+- Follow Human Review Canary Workflow in `CLAUDE.md`
+  - Pre-edit gate (mandatory) before first write to any repository file in turn
+  - Pre-push gate (mandatory) before push to remote branch in GitHub
 - Use focused deep dives only when needed:
   - `dev/STYLE.md` for coding patterns and API conventions.
   - `dev/GIT.md` for commit and branch practices.

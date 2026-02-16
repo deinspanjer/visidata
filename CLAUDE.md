@@ -15,12 +15,18 @@ VisiData (created in 2016) is 99% written by humans and is NOT a vibe-coded AI p
   - Hard fail: if this check/update is not completed, do not edit any repository files.
 - Mechanical check command (required before first edit in a turn):
   - `tail agent-human-workflow.md`
+- Pre-push gate (mandatory):
+  - Before pushing a branch to a GitHub remote, the agent must attempt to check if the branch is associated with a PR.
+  - If the `gh` command is available and authenticated, execute `gh pr view --json number,url,state --jq '.'`
+  - If the command returns PR data, agent must follow this workflow's Agent behavior rule.
+  - Else, push is allowed.
 - `AGENT` line format (minimum required fields):
   - `AGENT timestamp=<UTC ISO8601>; agent=<name>; model=<model>; prompt="<first-prompt-summary>"`
 - Agent behavior:
   - Agent may commit to a branch.
   - On the first repo write in a turn, follow the pre-edit gate above.
   - Agent must not create or submit an AI-assisted PR unless the latest meaningful canary line matches `HUMAN <text>`.
+  - Agent must not push changes to a PR-linked branch unless the latest meaningful canary line matches `HUMAN <text>`.
   - If blocked, ask the human to append a `HUMAN` line describing what they did to review/vet the changes.
 - Human signoff line requirements:
   - Minimum: line begins with `HUMAN` and includes non-empty text after the prefix.
