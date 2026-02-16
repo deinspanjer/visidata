@@ -16,3 +16,4 @@
 # HUMAN reviewed locally; ready for maintainer review; 2026-02-16; dev@example.com
 
 HUMAN dre created the first entry on 2026-02-15 before testing an agent edit.
+AGENT timestamp=2026-02-16T05:08:27Z; agent=codex; model=gpt-5; prompt="Create MovementGuide.md for core/search movement commands with links to docs and in-app references."
