@@ -2,12 +2,13 @@
 
 ## Start Here (Progressive Disclosure)
 - Read `CLAUDE.md` first for the primary contributor workflow and architecture context.
+- Pre-edit gate (mandatory)
+  - Follow Human Review Canary Workflow in `CLAUDE.md`
 - Use focused deep dives only when needed:
   - `dev/STYLE.md` for coding patterns and API conventions.
   - `dev/GIT.md` for commit and branch practices.
   - `dev/DOCS.md` for documentation syntax and style.
   - `dev/PERFORMANCE.md` for profiling and optimization work.
-- Human gate is required: all AI-assisted code must be reviewed, approved, and tested by a human before merge or PR.
 
 ## Project Structure
 - `visidata/`: main package (`features/`, `loaders/`, `apps/`, `themes/`).

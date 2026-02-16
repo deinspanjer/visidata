@@ -1,2 +1,4 @@
+- [ ] AI-assisted changes included
+- [ ] If AI-assisted, `agent-human-workflow.md` ends with a `HUMAN ...` signoff line.
 - [ ] If contributing a core loader, [the loader checklist](https://visidata.org/docs/contributing#loader) was referenced.
 - [ ] If registering an external plugin, [the plugin checklist](https://visidata.org/docs/contributing#plugins) was referenced.

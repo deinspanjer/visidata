@@ -6,6 +6,26 @@ Quick reference for VisiData development. For detailed coding patterns, conventi
 
 VisiData (created in 2016) is 99% written by humans and is NOT a vibe-coded AI project.  This file is meant to allow AI-assisted development of features and bugfixes.  **All code must be reviewed and approved and tested by a human before being merged into the codebase or submitted as a PR.**
 
+## Human Review Canary Workflow (AI-Assisted Code Rules)
+- Use `agent-human-workflow.md` as an append-only canary log.
+- Pre-edit gate (mandatory):
+  - Before the first write to any repository file in a turn (code, docs, tests, configs), the agent must check the latest meaningful canary line.
+  - If the latest meaningful line is `HUMAN ...`, append exactly one `AGENT ...` line immediately before making any other repo edit.
+  - If the latest meaningful line is `AGENT ...`, do not append another `AGENT` line for that turn.
+  - Hard fail: if this check/update is not completed, do not edit any repository files.
+- Mechanical check command (required before first edit in a turn):
+  - `tail agent-human-workflow.md`
+- `AGENT` line format (minimum required fields):
+  - `AGENT timestamp=<UTC ISO8601>; agent=<name>; model=<model>; prompt="<first-prompt-summary>"`
+- Agent behavior:
+  - Agent may commit to a branch.
+  - On the first repo write in a turn, follow the pre-edit gate above.
+  - Agent must not create or submit an AI-assisted PR unless the latest meaningful canary line matches `HUMAN <text>`.
+  - If blocked, ask the human to append a `HUMAN` line describing what they did to review/vet the changes.
+- Human signoff line requirements:
+  - Minimum: line begins with `HUMAN` and includes non-empty text after the prefix.
+  - Recommended (not required): action/decision, date, and git user/email.
+
 ## Repository Structure
 
 ```
