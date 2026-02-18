@@ -210,7 +210,7 @@ class ColorMaker:
                 if bg is None: bg = -1
                 try:
                     curses.init_pair(pairnum, fg, bg)
-                except (curses.error, ValueError):  # Python 3.10+ may raise ValueError
+                except curses.error as e:
                     return 0  # do not cache
                 self.color_pairs[(fg, bg)] = (pairnum, colorname)
 
