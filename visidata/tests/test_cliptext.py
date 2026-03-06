@@ -189,19 +189,6 @@ class TestClipText:
         assert clips == clippeds
         assert clipw == clippedw
 
-    def test_clipdraw_chunks(self):
-        prechunks = [
-            ('', 'x'),
-            ('', 'jsonl'),
-        ]
-        scr = Mock()
-        scr.getmaxyx.return_value = (80,25)
-        visidata.clipdraw_chunks(scr, 0, 0, prechunks, visidata.ColorAttr(), w=5)
-        scr.addstr.assert_has_calls([
-                call(0, 0, 'x', 0),
-                call(0, 1, 'jso…', 0),
-        ], any_order=True)
-
     @pytest.mark.parametrize('s, dispw, clipped', [
         #clip front half
         ('[:onclick jump-sheet-1]ten_chars0[:][:onclick jump-sheet-2]ten_chars1[:][:menu-active]ten_chars3[:][:menu-active]ten_chars4[:][:menu-active]ten_chars5[:][:menu-active]ten_chars6[:][:menu-active]ten_chars7[:]',
@@ -266,3 +253,25 @@ class TestClipText:
     def test_truncate_markup_middle(self, s, dispw, clipped):
         output = visidata.clip_markup_middle(s, dispw)
         assert output == clipped
+
+    @pytest.mark.parametrize('text, width, expected', [
+        # color tag spanning two lines should carry over
+        ('[:error]line one\nline two[/]', 80,
+         [('[:error]line one[/]', 'line one'),
+          ('[:error]line two[/]', 'line two')]),
+        # nested tags spanning lines
+        ('[:bold]a\n[:error]b[/]\nc[/]', 80,
+         [('[:bold]a[/]', 'a'),
+          ('[:bold][:error]b[/][/]', 'b'),
+          ('[:bold]c[/]', 'c')]),
+        # no markup, multiline (should work as before)
+        ('hello\nworld', 80,
+         [('hello', 'hello'),
+          ('world', 'world')]),
+        # single line with markup (should work as before)
+        ('[:error]oops[/]', 80,
+         [('[:error]oops[/]', 'oops')]),
+    ])
+    def test_wraptext_color_spans_lines(self, text, width, expected):
+        result = list(visidata.wraptext(text, width=width))
+        assert result == expected

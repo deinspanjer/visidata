@@ -82,6 +82,15 @@ def cellChanged(col, row, val):
     oldval = col.getValue(row)
     if oldval != val:
         rowid = col.sheet.rowid(row)
+
+        if rowid in col.sheet._deferredAdds:
+            col.putValue(row, val)
+            def _undoNewCellChanged(col, row, oldval):
+                col.putValue(row, oldval)
+            vd.addUndo(_undoNewCellChanged, col, row, oldval)
+            return
+
+
         if rowid not in col.sheet._deferredMods:
             rowmods = {}
             col.sheet._deferredMods[rowid] = (row, rowmods)

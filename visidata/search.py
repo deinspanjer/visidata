@@ -86,8 +86,8 @@ def searchInputRegex(sheet, action:str, columns:str='cursorCol'):
 def moveInputRegex(sheet, action:str, type="regex", **kwargs):
     r = vd.inputMultiple(regex=dict(prompt=f"{action} regex: ", type=type, defaultLast=True, help=vd.help_regex),
                          flags=dict(prompt="regex flags: ", type="regex_flags", value=sheet.options.regex_flags, help=vd.help_regex_flags))
-
-    return vd.moveRegex(sheet, regex=r['regex'], regex_flags=r['flags'], **kwargs)
+    vd.moveRegex(sheet, regex=r['regex'], regex_flags=r['flags'], **kwargs)
+    return r
 
 @Sheet.api
 @asyncthread
@@ -102,6 +102,11 @@ def search_expr(sheet, expr, reverse=False, curcol=None):
 
     vd.fail(f'no {sheet.rowtype} where {expr}')
 
+@BaseSheet.api
+def clear_search(sheet):
+    '''A stub function to clear any aftereffects of search, such as when
+       highlight_search is active.'''
+    pass
 
 Sheet.addCommand('r', 'search-keys', 'tmp=cursorVisibleColIndex; moveInputRegex("row key", type="regex-row", columns=keyCols or [visibleCols[0]]); sheet.cursorVisibleColIndex=tmp', 'go to next row with key matching regex')
 Sheet.addCommand('/', 'search-col', 'moveInputRegex("search", columns="cursorCol", backward=False)', 'search for regex forwards in current column')

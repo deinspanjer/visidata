@@ -21,6 +21,9 @@ VisiData uses different naming conventions for different contexts:
 - Methods with **embedded underscore** are private but available to VisiData internals
 - Methods **without underscores** (usually camelCase) are public API
 
+### Keybinding Notation
+- Capital letters like `Z` mean `Shift+Z`. `gZ` means `g` then `Shift+Z`. Don't confuse `z` (lowercase prefix) with `Z` (Shift+Z command).
+
 ### String Quoting Style
 - Most strings in VisiData are single-quoted
 - Within an execstr, inner strings are double-quoted
@@ -43,6 +46,13 @@ Otherwise they will not have full Sheet functionality from extensions.
 
 ### Command Placement
 Commands that reference a row or col should be on `Sheet` (not global or `BaseSheet`).
+
+## Loaders vs Features
+
+- **Loaders** (`visidata/loaders/`): Any module that defines a `vd.open_<ext>()` function. This is what makes `vd file.ext` or `vd file -f ext` work.
+- **Features** (`visidata/features/`): Everything else — commands, UI enhancements, integrations that don't define an `open_` entry point.
+
+If a module defines `open_<ext>`, it's a loader, even if it also adds commands or sheets.
 
 ## Feature File Structure
 
@@ -103,6 +113,9 @@ Sheet.addCommand('gEnter', 'dive-selected', 'openRows(selectedRows)', 'help')
 # Command with z prefix (zoom/single variant)
 Sheet.addCommand('zEnter', 'open-cell', 'vd.push(openCell(cursorCol, cursorRow))', 'help')
 ```
+
+### execstr Input Limitation
+An execstr can only call `input()` once per command execution, since replay provides a single input string. If a command needs multiple parameters, take them as a single input and split.
 
 ### Command Placement
 
@@ -198,6 +211,8 @@ AttrColumn('name')  # accesses row.name
 # ItemColumn - item access
 ItemColumn('key', 0)  # accesses row[0] or row['key']
 ```
+
+**Note**: `ColumnItem` is a deprecated alias for `ItemColumn`. Always use `ItemColumn` in new code.
 
 ### Getting Cell Values
 
@@ -320,6 +335,10 @@ api_key = vd.options.my_api_key or vd.fail(...)  # Don't do this
 
 Use **module name** or abbrevation as prefix for options used exclusively by that module.
 
+### Options Defined in Feature Files
+
+When core code (e.g. `sheets.py`) needs to check an option defined by a feature file, use `options.get()` with a default so it works even if the feature isn't loaded.  Don't define the option in two places with different defaults.
+
 ## Best Practices
 
 ### Documentation
@@ -399,6 +418,18 @@ Use **module name** or abbrevation as prefix for options used exclusively by tha
    vd.exceptionCaught(e)         # Log exception and continue (used in loops/async)
    ```
 
+   When a value should be a `TypedExceptionWrapper` on error but is not itself a larger error, use `wrapply` instead of `try/except`:
+   ```python
+   # ✅ GOOD - wrapply wraps exceptions into TypedExceptionWrapper automatically
+   result = wrapply(some_func, arg1, arg2)
+
+   # ❌ LESS GOOD - manual try/except for the same thing
+   try:
+       result = some_func(arg1, arg2)
+   except Exception as e:
+       result = TypedExceptionWrapper(None, exception=e)
+   ```
+
 4. **Fail-Fast for Required Resources**: When loading required external resources (templates, config files), fail immediately rather than falling back silently:
    ```python
    # ✅ GOOD - Fail fast if custom template can't be loaded
@@ -441,3 +472,9 @@ See `visidata/features/pypkg.py` for a complete, real-world example.
 - `visidata/sheet.py` - Core Sheet class
 - `visidata/column.py` - Column definitions
 - `visidata/main.py` - Application entry point
+
+## Tests
+
+### Prefer `.vdx` over `.vd` for new tests
+
+New golden tests should use the `.vdx` format (one command per line) rather than the `.vd` cmdlog format (tab-separated columns). `.vdx` is much more readable and easier to write.

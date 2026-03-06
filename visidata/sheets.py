@@ -2,8 +2,9 @@ import collections
 import itertools
 from copy import copy, deepcopy
 import textwrap
+import re
 
-from visidata import VisiData, Extensible, globalCommand, ColumnAttr, ColumnItem, vd, EscapeException, drawcache, drawcache_property, LazyChainMap, asyncthread, ExpectedException
+from visidata import VisiData, Extensible, globalCommand, ColumnAttr, ColumnItem, vd, EscapeException, drawcache, drawcache_property, LazyChainMap, asyncthread, ExpectedException, Fanout
 from visidata import (options, Column, namedlist, SettableColumn, AttrDict, DisplayWrapper,
 TypedExceptionWrapper, BaseSheet, UNLOADED, wrapply,
 clipdraw, clipdraw_chunks, ColorAttr, update_attr, colors, undoAttrFunc, vlen, dispwidth)
@@ -499,6 +500,11 @@ class TableSheet(BaseSheet):
         return [c for c in self.columns if not c.hidden and c not in self.keyCols]
 
     @property
+    def numericCols(self):
+        'Fanout of visible numeric columns.'
+        return Fanout(vd.numericCols(self.visibleCols))
+
+    @property
     def keyColNames(self):
         'String of key column names, for SheetsSheet convenience.'
         return ' '.join(c.name for c in self.keyCols)
@@ -801,7 +807,7 @@ class TableSheet(BaseSheet):
             if C and x+colwidth+dispwidth(C) < self.windowWidth and y+i < self.windowHeight:
                 scr.addstr(y+i, x+colwidth, C, sepcattr.attr)
 
-        clipdraw(scr, y+h-1, min(x+colwidth, self.windowWidth-1)-dispwidth(T), T, hdrcattr)
+        clipdraw(scr, y+h-1, min(x+colwidth, self.windowWidth-1)-dispwidth(T), T, hdrcattr, literal=True)
 
         try:
             if vcolidx == self.leftVisibleColIndex and col not in self.keyCols and self.nonKeyVisibleCols.index(col) > 0:
@@ -899,8 +905,8 @@ class TableSheet(BaseSheet):
                     break
 
         for aggrname, colidxs in self.allAggregators.items():
-            clipdraw(scr, y, 0, f' ', colors.color_aggregator, w=min(rightx+rightw+10, self.windowWidth-1))
-            clipdraw(scr, y, agglabelx, f' {aggrname:9}', colors.color_aggregator, truncator='')
+            clipdraw(scr, y, 0, f' ', colors.color_aggregator, w=min(rightx+rightw+10, self.windowWidth-1), literal=True)
+            clipdraw(scr, y, agglabelx, f' {aggrname:9}', colors.color_aggregator, truncator='', literal=True)
 
             for vcolidx in colidxs:
                 x, colwidth = self._visibleColLayout[vcolidx]
@@ -1035,20 +1041,29 @@ class TableSheet(BaseSheet):
                     elif len(lines) < height:
                         lines.extend([[('', '')]]*(height-len(lines)))
 
-                    for i, chunks in enumerate(lines):
+                    if self.options.get('highlight_search', False):
+                        hp = col.highlight_regex or self.highlight_regex
+                        hl_attr = colors.color_highlight_search
+                    else:
+                        hp = None
+
+                    for i, chunks in enumerate(lines): #chunks is a generator
                         y = ybase+i
 
                         sepchars = seps[i]
 
-                        pre = disp_truncator if hoffset != 0 else disp_column_fill
-                        prechunks = []
+                        left_hl = right_hl = False
+                        if hp: # chunks becomes a list
+                            chunks, left_hl, right_hl = self.highlight_chunks(chunks, hp, hoffset, colwidth, notewidth, cattr, hl_attr)
+                        else:
+                            chunks = [(attr, text[hoffset:]) for attr, text in chunks]
                         if colwidth > 2:
-                            prechunks.append(('', pre))
-
-                        for attr, text in chunks:
-                            prechunks.append((attr, text[hoffset:]))
-
-                        clipdraw_chunks(scr, y, x, prechunks, cattr if i < height-1 else bottomcattr, w=colwidth-notewidth)
+                            pre = disp_truncator if hoffset != 0 else disp_column_fill
+                            chunks.insert(0, (hl_attr if left_hl else cattr, pre))
+                        clipdraw_chunks(scr, y, x, chunks, cattr if i < height-1 else bottomcattr, w=colwidth-notewidth)
+                        if right_hl:
+                            hl_attr = update_attr(cattr, hl_attr, 100)
+                            clipdraw(scr, y, x+(colwidth-notewidth-1), disp_truncator, hl_attr, w=dispwidth(disp_truncator))
                         vd.onMouse(scr, x, y, colwidth, 1, BUTTON3_RELEASED='edit-cell')
 
                         if sepchars and x+colwidth+dispwidth(sepchars) <= self.windowWidth-1:
@@ -1057,7 +1072,7 @@ class TableSheet(BaseSheet):
             for notefunc in vd.rowNoters:
                 ch = notefunc(self, row)
                 if ch:
-                    clipdraw(scr, ybase, 0, ch, colors.color_note_row)
+                    clipdraw(scr, ybase, 0, ch, colors.color_note_row, literal=True)
                     break
 
             return height
@@ -1184,8 +1199,17 @@ def push(vd, vs, pane=0, load=True):
 def quit(vd, *sheets):
     'Remove *sheets* from sheets stack, asking for confirmation if needed.'
 
+    remaining = set(vd.stackedSheets) - set(sheets)
+    exiting = not remaining
+    if exiting and vd.options.quitguard and not vd._nextCommands:
+        nmodified = sum(1 for vs in sheets if vs.precious and vs.hasBeenModified)
+        modmsg = f' ({nmodified} sheet(s) modified)' if nmodified else ' (nothing modified)'
+        vd.draw_all()
+        vd.confirm(f'exit VisiData{modmsg}? ')
+
     for vs in sheets:
-        vs.confirmQuit('quit')
+        if not exiting:
+            vs.confirmQuit('quit')
         vs.pane = 0
         vd.remove(vs)
     if vd.activeCommand:
@@ -1305,7 +1329,7 @@ BaseSheet.addCommand('Tab', 'splitwin-swap', 'vd.activePane = 1 if sheet.pane ==
 BaseSheet.addCommand('gTab', 'splitwin-swap-pane', 'vd.options.disp_splitwin_pct=-vd.options.disp_splitwin_pct', 'swap panes onscreen')
 BaseSheet.addCommand('zZ', 'splitwin-input', 'vd.options.disp_splitwin_pct = input("% height for split window: ", value=vd.options.disp_splitwin_pct)', 'set split pane to specific size')
 
-BaseSheet.addCommand('Ctrl+L', 'redraw', 'sheet.refresh(); vd.redraw(); vd.draw_all()', 'Refresh screen')
+BaseSheet.addCommand('Ctrl+L', 'redraw', 'clear_search(); sheet.refresh(); vd.redraw(); vd.draw_all()', 'Refresh screen')
 BaseSheet.addCommand(None, 'guard-sheet', 'options.set("quitguard", True, sheet); status("guarded")', 'Set quitguard on current sheet to confirm before quit')
 BaseSheet.addCommand(None, 'guard-sheet-off', 'options.set("quitguard", False, sheet); status("unguarded")', 'Unset quitguard on current sheet to not confirm before quit')
 BaseSheet.addCommand(None, 'open-source', 'vd.replace(source)', 'jump to the source of this sheet')

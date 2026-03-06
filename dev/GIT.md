@@ -74,9 +74,29 @@ We've started doing this for PRs also. It's a bit of clutter but it helps:
 - Avoid regressions if the function ever gets rewritten
 - Track which issues resulted in actual code changes
 
+## GitHub Comments and Replies
+
+Commit before posting GitHub comments/replies. Let Saul push first, then post the comment. Don't post replies to issues before the relevant code is committed and pushed.
+
+AI-generated comments should have the model attribution at the bottom (e.g. `[Claude Opus 4.6]`), not the top.
+
 ## Branch and Merge Workflow
 
 In general:
 - Commits should be **rebased** instead of merged, for a more linear and less cluttered commit log
 - Try to **squash features** into a single commit (but don't over-squash either)
 - Keep the commit history clean and meaningful
+
+### Default Branch for Commits
+
+By default, commit to **develop** unless explicitly working in another branch on a PR. If on a different branch, cherry-pick or switch to develop first.
+
+### Pull Requests
+
+`develop` is the trunk branch. PRs come from side branches, not from develop directly. Create a feature branch off develop for PRs.
+
+After creating a PR, always check CI status with `gh pr checks` and fix any failures before moving on.
+
+### Bug Fix PRs
+
+Always add a regression test for bug fix PRs. Generate the golden output with the fix applied, and verify the test fails without the fix and passes with it.

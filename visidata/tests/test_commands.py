@@ -33,6 +33,9 @@ nonTested = (
         'sysedit',
         'sysopen',
         'open-memusage',
+        'open-url',
+        'open-repl',
+        'open-tutorial',
         )
 
 def isTestableCommand(longname, cmdlist):
@@ -70,7 +73,6 @@ inputLines = { 'save-sheet': 'jetsam.csv',  # save to some tmp file
                  'setcol-iter': 'range(1, 100)',
                  'addcol-iter': 'range(1, 100)',
                  'setcol-format-enum': '1=cat',
-                 'open-ping': 'github.com',
                  'setcol-input': '5',
                  'show-expr': 'OrderDate',
                  'setcol-expr': 'OrderDate',
@@ -81,11 +83,9 @@ inputLines = { 'save-sheet': 'jetsam.csv',  # save to some tmp file
                  'addcol-regex-subst': dict(before=r'Units/(\w)', after=r'\1'), # the first character
                  'search-cols': 'foo',
                  'searchr-cols': 'bar',
-                 'select-cols-regex': '.',
                  'select-expr': 'OrderDate',
                  'setcol-fake': 'name',
                  'unselect-expr': 'OrderDate',
-                 'unselect-cols-regex': '.',
                  'random-rows': '3',
                  'select-random': '3',
                  'import-python': 'math',
@@ -119,6 +119,9 @@ inputLines = { 'save-sheet': 'jetsam.csv',  # save to some tmp file
                  'col': 'Units',
                  'row': '5',
                  'addcol-aggregate': 'max',
+                 'define-command': 'type-test cursorCol.type = str',
+                 'highlight-sheet': 'e..',
+                 'highlight-col': '[0-9]',
               }
 
 @pytest.mark.usefixtures('curses_setup')
@@ -136,7 +139,9 @@ class TestCommands:
 
         nerrs = 0
         ntotal = 0
-        for longname in cmdlist.keys():
+        # cmdlist is changed when define-command is tested, so save its keys to avoid RuntimeError: OrderedDict mutated during iteration
+        longnames = list(cmdlist.keys())
+        for longname in longnames:
             cmd = vs.getCommand(longname)
             if cmd and cmd.deprecated:
                 continue

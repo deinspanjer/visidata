@@ -205,7 +205,7 @@ def clipstr(s, dispw, truncator=None, oddspace=None):
 def clipdraw(scr, y, x, s, attr, w=None, clear=True, literal=False, **kwargs):
     '''Draw `s`  at (y,x)-(y,x+w) with curses `attr`, clipping with ellipsis char.
        If `clear`, clear whole editing area before displaying.
-       If `literal`, do not interpret internal color code markup.
+       If `literal`, do not interpret internal vd code markup.
        Return width drawn (max of w).
     '''
     if not literal:
@@ -219,10 +219,11 @@ def clipdraw(scr, y, x, s, attr, w=None, clear=True, literal=False, **kwargs):
     return clipdraw_chunks(scr, y, x, chunks, attr, w=w, clear=clear, **kwargs)
 
 
-def clipdraw_chunks(scr, y, x, chunks, cattr:ColorAttr=ColorAttr(), w=None, clear=True, literal=False, **kwargs):
+def clipdraw_chunks(scr, y, x, chunks, cattr:ColorAttr=ColorAttr(), w=None, clear=True, **kwargs):
     '''Draw `chunks` (sequence of (color:str, text:str) as from iterchunks) at (y,x)-(y,x+w) with curses `attr`, clipping with ellipsis char.
        If `clear`, clear whole editing area before displaying.
        Return width drawn (max of w).
+       Text elements of `chunks` are literal, meaning any contained vd code markup is drawn raw as uninterpreted text.
     '''
     if scr:
         windowHeight, windowWidth = scr.getmaxyx()
@@ -244,17 +245,21 @@ def clipdraw_chunks(scr, y, x, chunks, cattr:ColorAttr=ColorAttr(), w=None, clea
     try:
         for colorstate, chunk in chunks:
             if colorstate:
-                if isinstance(colorstate, str):
-                    cattr = cattr.update(colors.get_color(colorstate), 100)
+                if isinstance(colorstate, ColorAttr):
+                    cattr = origattr.update(colorstate, 100)
+                elif isinstance(colorstate, str):
+                    cattr = origattr.update(colors.get_color(colorstate), 100)
                 else:
                     cattr = origattr.update(colorstate['cattr'], 100)
                     link = colorstate['link']
+            else:
+                cattr = origattr
 
             if not chunk:
                 continue
 
             if origw is None:
-                chunkw = dispwidth(chunk, maxwidth=windowWidth-totaldispw)
+                chunkw = dispwidth(chunk, maxwidth=windowWidth-totaldispw, literal=True)
             else:
                 chunkw = origw-totaldispw
 
@@ -310,13 +315,29 @@ def wraptext(text, width=80, indent=''):
     if width <= 0:
         return
 
+    active_tags = []  # stack of open markup tags carried across lines #2212
+
     for line in text.splitlines():
         if not line:
             yield '', ''
             continue
 
         line = _markdown_to_internal(line)
+        # prepend any active (unclosed) tags from previous lines
+        line = ''.join(active_tags) + line
         chunks = re.split(internal_markup_re, line)
+
+        # track which tags are still open at end of this line
+        line_tags = []
+        for chunk in chunks:
+            if is_vdcode(chunk):
+                if chunk.startswith('[:'):
+                    line_tags.append(chunk)
+                elif chunk.startswith('[/'):
+                    if line_tags:
+                        line_tags.pop()
+        active_tags = line_tags
+
         textchunks = [x for x in chunks if not is_vdcode(x)]
         if ''.join(textchunks) == '':  #for markup with no contents, like '[:tag][/]' or '[:]' or '[/]'
             yield '', ''
@@ -341,6 +362,18 @@ def wraptext(text, width=80, indent=''):
                 txt = txt[len(c):]
 
             r = r.strip()
+            # close any unclosed tags at end of line, reopen at start of next
+            if active_tags:
+                # count how many tags are open but not closed in r
+                open_in_r = []
+                for part in re.split(internal_markup_re, r):
+                    if is_vdcode(part):
+                        if part.startswith('[:'):
+                            open_in_r.append(part)
+                        elif part.startswith('[/') and open_in_r:
+                            open_in_r.pop()
+                r += '[/]' * len(open_in_r)
+
             if linenum > 0:
                 r = indent + r
             yield r, textline
@@ -348,16 +381,6 @@ def wraptext(text, width=80, indent=''):
         for c in chunks:
             yield c, ''
 
-
-def clipbox(scr, lines, attr, title=''):
-    scr.erase()
-    scr.bkgd(attr)
-    scr.box()
-    h, w = scr.getmaxyx()
-    for i, line in enumerate(lines):
-        clipdraw(scr, i+1, 2, line, attr)
-
-    clipdraw(scr, 0, w-dispwidth(title)-6, f"| {title} |", attr)
 
 def clipstr_start(dispval, w, truncator='', literal=False):
     '''Return a tuple (frag, dw), where *frag* is the longest ending substring
@@ -455,7 +478,6 @@ def clip_markup_middle(s:str, w:int):
 vd.addGlobals(clipstr=clipstr,
               clipdraw=clipdraw,
               clipdraw_chunks=clipdraw_chunks,
-              clipbox=clipbox,
               dispwidth=dispwidth,
               iterchars=iterchars,
               iterchunks=iterchunks,

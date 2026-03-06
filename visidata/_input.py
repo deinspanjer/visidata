@@ -19,6 +19,7 @@ class AcceptInput(Exception):
     '*args[0]* is the input to be accepted'
 
 vd._injectedInput = None  # for vd.injectInput
+vd.editCellBindings = {}  # user-customizable bindings for cell editing; use acceptThenFunc() to define
 
 
 @VisiData.api
@@ -424,7 +425,7 @@ def inputsingle(vd, prompt, record=True):
     y = sheet.windowHeight-1
     w = sheet.windowWidth
     rstatuslen = vd.drawRightStatus(sheet._scr, sheet)
-    promptlen = clipdraw(sheet._scr, y, 0, prompt, 0, w=w-rstatuslen-1)
+    promptlen = clipdraw(sheet._scr, y, 0, prompt, 0, w=w-rstatuslen-1, literal=True)
     sheet._scr.move(y, w-promptlen-rstatuslen-2)
 
     while not v:
@@ -489,9 +490,10 @@ def inputMultiple(vd, updater=lambda val: None, record=True, **kwargs):
         for k, v in kwargs.items():
             #recalculate y to adjust for screen resizes during input()
             y = sheet.windowHeight-v.get('dy')-1
-            maxw = min(sheet.windowWidth-1, max(dispwidth(v.get('prompt')), dispwidth(str(v.get('value', '')), literal=True)))
-            promptlen = clipdraw(scr, y, 0, v.get('prompt'), attr, w=maxw)  #1947
-            promptlen = clipdraw(scr, y, promptlen, v.get('value', ''),  attr, w=maxw)
+            maxw = min(sheet.windowWidth-1, max(dispwidth(v.get('prompt'), literal=True),
+                                                dispwidth(str(v.get('value', '')), literal=True)))
+            promptlen = clipdraw(scr, y, 0, v.get('prompt'), attr, w=maxw, literal=True)  #1947
+            promptlen = clipdraw(scr, y, promptlen, v.get('value', ''),  attr, w=maxw, literal=True)
 
         return updater(val)
 
@@ -664,11 +666,18 @@ def editCell(self, vcolidx=None, rowidx=None, value=None, **kwargs):
     }
 
     if vcolidx == self.nVisibleCols-1 or vcolidx >= self.nCols-1:
-        bindings['Tab'] = acceptThenFunc('go-down', 'go-leftmost', 'edit-cell')
+        if rowidx < 0:
+            bindings['Tab'] = acceptThenFunc('go-leftmost', 'rename-col')
+        else:
+            bindings['Tab'] = acceptThenFunc('go-down', 'go-leftmost', 'edit-cell')
 
     if vcolidx <= 0:
-        bindings['Shift+Tab'] = acceptThenFunc('go-up', 'go-rightmost', 'edit-cell')
+        if rowidx < 0:
+            bindings['Shift+Tab'] = acceptThenFunc('go-rightmost', 'rename-col')
+        else:
+            bindings['Shift+Tab'] = acceptThenFunc('go-up', 'go-rightmost', 'edit-cell')
 
+    bindings.update(vd.editCellBindings)
     # update local bindings with kwargs.bindings instead of the inverse, to preserve kwargs.bindings for caller
     bindings.update(kwargs.get('bindings', {}))
     kwargs['bindings'] = bindings
@@ -687,4 +696,4 @@ def editCell(self, vcolidx=None, rowidx=None, value=None, **kwargs):
     return r
 
 
-vd.addGlobals(CompleteKey=CompleteKey, AcceptInput=AcceptInput, InputWidget=InputWidget)
+vd.addGlobals(CompleteKey=CompleteKey, AcceptInput=AcceptInput, InputWidget=InputWidget, acceptThenFunc=acceptThenFunc)
